@@ -17,6 +17,9 @@
     <button class="btn-principal" onclick="mostrarPantalla('pantalla-nueva-orden')">
       + Nueva Cotización
     </button>
+    <button class="btn-principal verde" onclick="mostrarPantalla('pantalla-dashboard')">
+      📊 Cuadro de Control
+    </button>
     <div id="lista-ordenes" class="lista-ordenes">
       <p class="cargando">Cargando órdenes...</p>
     </div>
@@ -36,6 +39,9 @@
       <label>Descripción del pedido</label>
       <input type="text" id="descripcion" placeholder="Ej: 1000 volantes carta" />
 
+      <label>Cantidad (unidades)</label>
+      <input type="number" id="cantidad" placeholder="Ej: 1000" min="1" onchange="calcularTotal()" />
+
       <label>Fecha de entrega</label>
       <input type="date" id="fecha-entrega" />
 
@@ -43,6 +49,28 @@
       <div id="componentes-lista">
         <!-- Se genera con JavaScript -->
       </div>
+
+      <h3>📄 Datos para el PDF</h3>
+      <div id="campos-pdf-lista">
+        <div class="componente-fila"><label>Trabajo</label><input type="text" id="pdf-trabajo" placeholder="Ej: Cuaderno 80 hojas" /></div>
+        <div class="componente-fila"><label>Tamaño</label><input type="text" id="pdf-tamano" placeholder="Ej: 22 x 17 cms" /></div>
+        <div class="componente-fila"><label>Tinta interna</label><input type="text" id="pdf-tinta-interna" placeholder="Ej: 1x1" /></div>
+        <div class="componente-fila"><label>Tinta carátula</label><input type="text" id="pdf-tinta-caratula" placeholder="Ej: A todo color" /></div>
+        <div class="componente-fila"><label>Papel carátula</label><input type="text" id="pdf-papel-caratula" placeholder="Ej: Propalcote 150 grs" /></div>
+        <div class="componente-fila"><label>Papel interior</label><input type="text" id="pdf-papel-interior" placeholder="Ej: Bond 75 grs" /></div>
+        <div class="componente-fila"><label>Acabado</label><input type="text" id="pdf-acabado" placeholder="Ej: Laminado mate, argollado" /></div>
+        <div class="componente-fila"><label>Forma de pago</label><input type="text" id="pdf-pago" placeholder="Ej: 50% al contratar, 50% entrega" value="50% al contratar y 50% contra entrega." /></div>
+      </div>
+      <div id="campos-extra-pdf"></div>
+      <button type="button" class="btn-principal" style="background:#718096;font-size:15px;padding:12px;margin-bottom:8px" onclick="agregarCampoPDF()">
+        + Añadir otro campo al PDF
+      </button>
+
+      <h3>➕ Otros conceptos</h3>
+      <div id="otros-lista"></div>
+      <button type="button" class="btn-principal" style="background:#718096;font-size:15px;padding:12px;margin-bottom:8px" onclick="agregarOtro()">
+        + Añadir otro concepto
+      </button>
 
       <h3>⚙️ Porcentajes</h3>
       <div class="fila-porcentaje">
@@ -67,7 +95,8 @@
         <div class="fila-resumen"><span>+ Indirectos:</span><span id="res-indirectos">$0</span></div>
         <div class="fila-resumen"><span>+ Margen:</span><span id="res-margen">$0</span></div>
         <div class="fila-resumen" id="fila-res-rete" style="display:none"><span>+ Retefuente:</span><span id="res-rete">$0</span></div>
-        <div class="fila-resumen total"><span>PRECIO A COBRAR:</span><span id="res-total">$0</span></div>
+        <div class="fila-resumen total"><span>VALOR UNITARIO:</span><span id="res-unitario">$0</span></div>
+        <div class="fila-resumen total" style="font-size:22px;color:#1a365d;background:#bee3f8;padding:12px;border-radius:8px;margin-top:8px"><span>VALOR TOTAL:</span><span id="res-total">$0</span></div>
       </div>
 
       <button class="btn-principal" onclick="guardarCotizacion()">💾 Guardar Cotización</button>
@@ -106,7 +135,7 @@
     </div>
   </div>
 
-  <!-- PANTALLA 5: ANÁLISIS -->
+<!-- PANTALLA 5: ANÁLISIS -->
   <div id="pantalla-analisis" class="pantalla">
     <div class="header">
       <button class="btn-volver" onclick="volverADetalle()">← Volver</button>
@@ -114,6 +143,19 @@
     </div>
     <div id="analisis-contenido" class="formulario"></div>
   </div>
+
+  <!-- PANTALLA 6: DASHBOARD -->
+  <div id="pantalla-dashboard" class="pantalla">
+    <div class="header">
+      <button class="btn-volver" onclick="mostrarPantalla('pantalla-inicio')">← Volver</button>
+      <h2>📊 Cuadro de Control</h2>
+    </div>
+    <div id="dashboard-contenido" class="formulario">
+      <p class="cargando">Cargando...</p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>

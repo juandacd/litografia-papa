@@ -27,8 +27,7 @@ const COMPONENTES = [
   'Plegado',
   'Estampado',
   'Instalación',
-  'Fletes',
-  'Otros'
+  'Fletes'
 ];
 
 // =============================================
@@ -42,6 +41,7 @@ function mostrarPantalla(id) {
 
   if (id === 'pantalla-inicio') cargarOrdenes();
   if (id === 'pantalla-nueva-orden') inicializarFormulario();
+  if (id === 'pantalla-dashboard') cargarDashboard();
 }
 
 function volverADetalle() {
@@ -76,6 +76,74 @@ function inicializarFormulario() {
   calcularTotal();
 }
 
+let contadorOtros = 0;
+
+function agregarOtro() {
+  contadorOtros++;
+  const contenedor = document.getElementById('otros-lista');
+  const fila = document.createElement('div');
+  fila.className = 'componente-fila';
+  fila.id = `otro-fila-${contadorOtros}`;
+  fila.innerHTML = `
+    <input type="text" placeholder="Concepto" 
+      style="flex:1;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;margin-right:8px" />
+    <input type="number" placeholder="$0" min="0" 
+      class="otro-valor"
+      style="width:110px;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;text-align:right"
+      onchange="calcularTotal()" />
+    <button onclick="eliminarOtro(${contadorOtros})" 
+      style="background:none;border:none;color:#e53e3e;font-size:20px;cursor:pointer;margin-left:8px">✕</button>
+  `;
+  contenedor.appendChild(fila);
+}
+
+function eliminarOtro(id) {
+  const fila = document.getElementById(`otro-fila-${id}`);
+  if (fila) { fila.remove(); calcularTotal(); }
+}
+
+let contadorCamposPDF = 0;
+
+function agregarCampoPDF() {
+  contadorCamposPDF++;
+  const contenedor = document.getElementById('campos-extra-pdf');
+  const fila = document.createElement('div');
+  fila.className = 'componente-fila';
+  fila.id = `campo-pdf-${contadorCamposPDF}`;
+  fila.innerHTML = `
+    <input type="text" placeholder="Nombre del campo" 
+      style="flex:1;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;margin-right:8px" />
+    <input type="text" placeholder="Valor" 
+      style="flex:1;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;margin-right:8px" />
+    <button onclick="document.getElementById('campo-pdf-${contadorCamposPDF}').remove()" 
+      style="background:none;border:none;color:#e53e3e;font-size:20px;cursor:pointer">✕</button>
+  `;
+  contenedor.appendChild(fila);
+}
+
+function recopilarCamposPDF() {
+  const campos = {
+    trabajo: document.getElementById('pdf-trabajo')?.value.trim() || '',
+    tamano: document.getElementById('pdf-tamano')?.value.trim() || '',
+    tintaInterna: document.getElementById('pdf-tinta-interna')?.value.trim() || '',
+    tintaCaratula: document.getElementById('pdf-tinta-caratula')?.value.trim() || '',
+    papelCaratula: document.getElementById('pdf-papel-caratula')?.value.trim() || '',
+    papelInterior: document.getElementById('pdf-papel-interior')?.value.trim() || '',
+    acabado: document.getElementById('pdf-acabado')?.value.trim() || '',
+    pago: document.getElementById('pdf-pago')?.value.trim() || '',
+    extras: []
+  };
+
+  document.querySelectorAll('#campos-extra-pdf .componente-fila').forEach(fila => {
+    const inputs = fila.querySelectorAll('input');
+    const nombre = inputs[0]?.value.trim();
+    const valor = inputs[1]?.value.trim();
+    if (nombre && valor) campos.extras.push({ nombre, valor });
+  });
+
+  return campos;
+}
+
 function calcularTotal() {
   let costoBase = 0;
   COMPONENTES.forEach(comp => {
@@ -83,6 +151,12 @@ function calcularTotal() {
     if (input) costoBase += parseFloat(input.value) || 0;
   });
 
+  // Sumar otros conceptos
+  document.querySelectorAll('.otro-valor').forEach(input => {
+    costoBase += parseFloat(input.value) || 0;
+  });
+
+  const cantidad = parseFloat(document.getElementById('cantidad')?.value) || 1;
   const pctIndirectos = parseFloat(document.getElementById('pct-indirectos').value) / 100 || 0;
   const pctMargen = parseFloat(document.getElementById('pct-margen').value) / 100 || 0;
   const aplicaRete = document.getElementById('aplica-rete').checked;
@@ -100,6 +174,8 @@ function calcularTotal() {
   document.getElementById('res-margen').textContent = `+${formatPesos(margen)}`;
   document.getElementById('res-rete').textContent = `+${formatPesos(rete)}`;
   document.getElementById('res-total').textContent = formatPesos(total);
+  const unitario = cantidad > 0 ? total / cantidad : 0;
+  document.getElementById('res-unitario').textContent = formatPesos(unitario);
 }
 
 async function guardarCotizacion() {
@@ -115,6 +191,16 @@ async function guardarCotizacion() {
     const valor = parseFloat(input?.value) || 0;
     if (valor > 0) {
       items.push({ componente: comp, valor });
+      costoBase += valor;
+    }
+  });
+
+  // Guardar otros conceptos
+  document.querySelectorAll('#otros-lista .componente-fila').forEach(fila => {
+    const nombre = fila.querySelector('input[type="text"]')?.value.trim();
+    const valor = parseFloat(fila.querySelector('.otro-valor')?.value) || 0;
+    if (nombre && valor > 0) {
+      items.push({ componente: nombre, valor });
       costoBase += valor;
     }
   });
@@ -142,6 +228,8 @@ async function guardarCotizacion() {
     aplica_retefuente: aplicaRete,
     porcentaje_retefuente: pctRete,
     precio_sugerido: precioSugerido,
+    cantidad: parseFloat(document.getElementById('cantidad').value) || 1,
+    campos_pdf: recopilarCamposPDF(),
     estado: 'cotizacion'
   }]).select().single();
 
@@ -217,6 +305,9 @@ async function cargarDetalle(ordenId) {
 
   const contenido = document.getElementById('detalle-contenido');
   contenido.innerHTML = `
+    <button class="btn-principal" style="background:#e53e3e;font-size:14px;padding:10px" onclick="borrarOrden(${ordenId})">
+      🗑️ Borrar esta cotización
+    </button>
     <div class="analisis-card azul">
       <div>Cliente</div>
       <div class="valor" style="font-size:20px">${orden.cliente}</div>
@@ -233,6 +324,10 @@ async function cargarDetalle(ordenId) {
       ${orden.aplica_retefuente ? `<div class="fila-resumen"><span>+ Retefuente (${orden.porcentaje_retefuente}%)</span><span>${formatPesos(orden.precio_sugerido * orden.porcentaje_retefuente / 100)}</span></div>` : ''}
       <div class="fila-resumen total"><span>PRECIO A COBRAR</span><span>${formatPesos(orden.precio_sugerido)}</span></div>
     </div>
+
+    <button class="btn-principal" style="background:#c05621" onclick="generarPDF(${ordenId})">
+      📄 Generar PDF Cotización
+    </button>
 
     <button class="btn-whatsapp" onclick="compartirWhatsApp(${JSON.stringify(orden).replace(/"/g, '&quot;')}, ${JSON.stringify(items || []).replace(/"/g, '&quot;')})">
       📱 Enviar por WhatsApp
@@ -390,6 +485,346 @@ function formatPesos(valor) {
     currency: 'COP',
     minimumFractionDigits: 0
   }).format(valor || 0);
+}
+
+// =============================================
+// DASHBOARD / CUADRO DE CONTROL
+// =============================================
+async function cargarDashboard() {
+  const contenedor = document.getElementById('dashboard-contenido');
+  contenedor.innerHTML = '<p class="cargando">Cargando...</p>';
+
+  const { data: ordenes } = await db.from('ordenes').select('*').order('fecha_entrega', { ascending: true });
+
+  if (!ordenes) { contenedor.innerHTML = '<p class="cargando">Error cargando datos</p>'; return; }
+
+  const total = ordenes.length;
+  const pendientes = ordenes.filter(o => o.estado === 'cotizacion').length;
+  const aprobadas = ordenes.filter(o => o.estado_aprobacion === 'aprobada').length;
+  const cerradas = ordenes.filter(o => o.estado === 'cerrada').length;
+
+  const hoy = new Date();
+  const en3dias = new Date();
+  en3dias.setDate(hoy.getDate() + 3);
+
+  const proximasAVencer = ordenes.filter(o => {
+    if (!o.fecha_entrega || o.estado === 'cerrada') return false;
+    const fecha = new Date(o.fecha_entrega);
+    return fecha <= en3dias && fecha >= hoy;
+  });
+
+  const vencidas = ordenes.filter(o => {
+    if (!o.fecha_entrega || o.estado === 'cerrada') return false;
+    const fecha = new Date(o.fecha_entrega);
+    return fecha < hoy;
+  });
+
+  const totalCotizado = ordenes.reduce((sum, o) => sum + (o.precio_sugerido || 0), 0);
+  const totalCobrado = ordenes.reduce((sum, o) => sum + (o.cobrado_real || 0), 0);
+
+  // Mes actual
+  const mesActual = hoy.getMonth();
+  const anioActual = hoy.getFullYear();
+  const ordenesMes = ordenes.filter(o => {
+    const fecha = new Date(o.created_at);
+    return fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
+  });
+  const cotizadoMes = ordenesMes.reduce((sum, o) => sum + (o.precio_sugerido || 0), 0);
+  const cobradoMes = ordenesMes.reduce((sum, o) => sum + (o.cobrado_real || 0), 0);
+
+  let alertasHTML = '';
+  if (vencidas.length > 0) {
+    alertasHTML += `<div class="analisis-card rojo">
+      <div>🚨 Órdenes vencidas (${vencidas.length})</div>
+      ${vencidas.map(o => `<div style="margin-top:8px;font-weight:bold">${o.numero_orden} - ${o.cliente}</div>`).join('')}
+    </div>`;
+  }
+  if (proximasAVencer.length > 0) {
+    alertasHTML += `<div class="analisis-card" style="border-color:#f6ad55;background:#fffaf0">
+      <div>⚠️ Próximas a vencer (${proximasAVencer.length})</div>
+      ${proximasAVencer.map(o => `<div style="margin-top:8px;font-weight:bold;color:#c05621">${o.numero_orden} - ${o.cliente} → ${o.fecha_entrega}</div>`).join('')}
+    </div>`;
+  }
+
+  contenedor.innerHTML = `
+    <h3>📅 Mes actual</h3>
+    <div class="analisis-card azul">
+      <div>💰 Cotizado este mes</div>
+      <div class="valor">${formatPesos(cotizadoMes)}</div>
+    </div>
+    <div class="analisis-card verde">
+      <div>✅ Cobrado este mes</div>
+      <div class="valor">${formatPesos(cobradoMes)}</div>
+    </div>
+
+    <h3>📊 Resumen general</h3>
+    <div class="resumen-cotizacion">
+      <div class="fila-resumen"><span>Total órdenes</span><span>${total}</span></div>
+      <div class="fila-resumen"><span>📝 En cotización</span><span>${pendientes}</span></div>
+      <div class="fila-resumen"><span>✅ Aprobadas</span><span>${aprobadas}</span></div>
+      <div class="fila-resumen"><span>🏁 Cerradas</span><span>${cerradas}</span></div>
+      <div class="fila-resumen total"><span>Total cotizado</span><span>${formatPesos(totalCotizado)}</span></div>
+      <div class="fila-resumen total"><span>Total cobrado</span><span>${formatPesos(totalCobrado)}</span></div>
+    </div>
+
+    ${alertasHTML}
+
+    <h3>📋 Todas las órdenes</h3>
+    ${ordenes.map(o => `
+      <div class="tarjeta-orden">
+        <div class="orden-numero">${o.numero_orden}</div>
+        <div class="orden-cliente">${o.cliente}</div>
+        <div class="orden-descripcion">${o.descripcion || ''}</div>
+        <div class="orden-footer">
+          <span class="badge ${o.estado}">${o.estado}</span>
+          <span class="badge ${o.estado_aprobacion === 'aprobada' ? 'cerrada' : 'cotizacion'}">
+            ${o.estado_aprobacion === 'aprobada' ? '✅ Aprobada' : '⏳ Pendiente'}
+          </span>
+        </div>
+        ${o.estado !== 'cerrada' ? `
+        <button class="btn-principal ${o.estado_aprobacion === 'aprobada' ? 'naranja' : 'verde'}" 
+          style="margin-top:10px;font-size:14px;padding:10px"
+          onclick="toggleAprobacion(${o.id}, '${o.estado_aprobacion}')">
+          ${o.estado_aprobacion === 'aprobada' ? '↩️ Marcar como pendiente' : '✅ Marcar como aprobada'}
+        </button>` : ''}
+      </div>
+    `).join('')}
+
+    <h3>📥 Exportar datos</h3>
+    <button class="btn-principal" onclick="exportarExcel()">
+      📊 Descargar Excel con todas las órdenes
+    </button>
+  `;
+}
+
+async function toggleAprobacion(ordenId, estadoActual) {
+  const nuevoEstado = estadoActual === 'aprobada' ? 'pendiente' : 'aprobada';
+  await db.from('ordenes').update({ estado_aprobacion: nuevoEstado }).eq('id', ordenId);
+  cargarDashboard();
+}
+
+// =============================================
+// EXPORTAR A EXCEL
+// =============================================
+async function exportarExcel() {
+  const { data: ordenes } = await db.from('ordenes').select('*').order('created_at', { ascending: false });
+
+  if (!ordenes || ordenes.length === 0) { alert('No hay órdenes para exportar'); return; }
+
+  const filas = [
+    ['Número Orden', 'Cliente', 'Descripción', 'Fecha Entrega', 'Estado', 'Aprobación', 'Precio Sugerido', 'Cobrado Real', 'Ganancia', 'Margen Real %', 'Fecha Creación']
+  ];
+
+  ordenes.forEach(o => {
+    const ganancia = (o.cobrado_real || 0) - 0;
+    const margen = o.cobrado_real > 0 ? ((o.cobrado_real - 0) / o.cobrado_real * 100).toFixed(1) : '';
+    filas.push([
+      o.numero_orden,
+      o.cliente,
+      o.descripcion || '',
+      o.fecha_entrega || '',
+      o.estado,
+      o.estado_aprobacion,
+      o.precio_sugerido || 0,
+      o.cobrado_real || 0,
+      o.cobrado_real || 0,
+      margen,
+      new Date(o.created_at).toLocaleDateString('es-CO')
+    ]);
+  });
+
+  // Convertir a CSV (compatible con Excel)
+  const csv = filas.map(fila =>
+    fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(',')
+  ).join('\n');
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `litografia_ordenes_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// =============================================
+// GENERAR PDF
+// =============================================
+
+function cargarImagenBase64(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function generarPDF(ordenId) {
+  const { data: orden } = await db.from('ordenes').select('*').eq('id', ordenId).single();
+  if (!orden) { alert('No se pudo cargar la orden'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const margenIzq = 20;
+  const margenDer = 190;
+  const ancho = margenDer - margenIzq;
+  let y = 15;
+
+  // Logo
+  try {
+    const logoImg = await cargarImagenBase64('./Logo_Digital_Center.png');
+    doc.addImage(logoImg, 'PNG', margenIzq, y, 35, 30);
+  } catch(e) { console.log('Logo no cargado:', e); }
+
+  // Encabezado empresa
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Digital Center', 60, y + 8);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('¡Imprime tus ideas!', 60, y + 14);
+  doc.text('NIT: 1152467424-7', 60, y + 20);
+  doc.text('TEL. 319 392 0654', 60, y + 26);
+  doc.text('Medellín - Colombia', 60, y + 32);
+
+  y += 45;
+
+  // Fecha y cliente
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.setFontSize(10);
+  doc.text(`Medellín, ${fechaHoy}`, margenIzq, y);
+  y += 8;
+  doc.text('Señores', margenIzq, y);
+  y += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text(orden.cliente.toUpperCase(), margenIzq, y);
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('De acuerdo a su amable solicitud estamos cotizando el siguiente trabajo:', margenIzq, y);
+  y += 10;
+
+  // Línea separadora
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margenIzq, y, margenDer, y);
+  y += 6;
+
+  // Campos del PDF
+  const campos = orden.campos_pdf || {};
+  const camposBase = [
+    { label: 'TRABAJO', valor: campos.trabajo },
+    { label: 'TAMAÑO', valor: campos.tamano },
+    { label: 'TINTA INTERNA', valor: campos.tintaInterna },
+    { label: 'TINTA CARÁTULA', valor: campos.tintaCaratula },
+    { label: 'PAPEL CARÁT.', valor: campos.papelCaratula },
+    { label: 'PAPEL INT.', valor: campos.papelInterior },
+    { label: 'ACABADO', valor: campos.acabado },
+  ];
+
+  // Campos extras
+  const extras = campos.extras || [];
+  const todosLosCampos = [
+    ...camposBase.filter(c => c.valor),
+    ...extras.map(e => ({ label: e.nombre?.toUpperCase() || e.label?.toUpperCase(), valor: e.valor }))
+  ];
+
+  todosLosCampos.forEach(campo => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${campo.label}:`, margenIzq, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(campo.valor, margenIzq + 45, y);
+    y += 7;
+  });
+
+  // Cantidad
+  if (orden.cantidad && orden.cantidad > 1) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('CANTIDAD:', margenIzq, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(orden.cantidad), margenIzq + 45, y);
+    y += 7;
+  }
+
+  // Valores
+  const valorUnit = orden.cantidad > 1 ? orden.precio_sugerido / orden.cantidad : null;
+  doc.setFont('helvetica', 'bold');
+
+  if (valorUnit) {
+    doc.text('VALOR UNIT.:', margenIzq, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatPesos(valorUnit), margenIzq + 45, y);
+    y += 7;
+    doc.setFont('helvetica', 'bold');
+  }
+
+  doc.text('VALOR TOTAL:', margenIzq, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(formatPesos(orden.precio_sugerido), margenIzq + 45, y);
+  y += 10;
+
+  // Línea separadora
+  doc.line(margenIzq, y, margenDer, y);
+  y += 8;
+
+  // Notas
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('LOS DISEÑOS ANTERIORES SERAN SUMINISTRADOS POR EL CLIENTE', margenIzq, y);
+  y += 8;
+
+  const formaPago = campos.formaPago || '50% al contratar y 50% contra entrega.';
+  doc.text(`FORMA DE PAGO: ${formaPago}`, margenIzq, y);
+  y += 10;
+
+  doc.setFont('helvetica', 'normal');
+  const notaRst = '"Digital Center se encuentra inscrita en el Régimen Simple de Tributación (RST), por lo tanto, los valores aquí relacionados no causan IVA"';
+  const lineasNota = doc.splitTextToSize(notaRst, ancho);
+  doc.text(lineasNota, margenIzq, y);
+  y += lineasNota.length * 5 + 15;
+
+  // Firma
+  doc.setFont('helvetica', 'bold');
+  doc.text('Cordialmente,', margenIzq, y);
+  y += 12;
+  doc.text('EDWIN CORREA', margenIzq, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Gerente', margenIzq, y);
+
+  // Pie de página
+  doc.setFontSize(8);
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margenIzq, 280, margenDer, 280);
+  doc.text('dc.digitalcenter / TEL. 319 392 0654 / MEDELLIN- COLOMBIA / E-MAIL.: dc.digitalcenter7@gmail.com', margenIzq, 285);
+
+  // Descargar
+  doc.save(`Cotizacion_${orden.numero_orden}_${orden.cliente}.pdf`);
+}
+
+// =============================================
+// BORRAR ORDEN
+// =============================================
+async function borrarOrden(ordenId) {
+  const confirmado = confirm('¿Estás seguro de que quieres borrar esta cotización? Esta acción no se puede deshacer.');
+  if (!confirmado) return;
+
+  await db.from('cotizacion_items').delete().eq('orden_id', ordenId);
+  await db.from('gasto_items').delete().eq('orden_id', ordenId);
+  await db.from('ordenes').delete().eq('id', ordenId);
+
+  alert('✅ Cotización borrada correctamente');
+  mostrarPantalla('pantalla-inicio');
 }
 
 // Iniciar app
