@@ -116,22 +116,28 @@
   <div id="pantalla-gastos" class="pantalla">
     <div class="header">
       <button class="btn-volver" onclick="volverADetalle()">← Volver</button>
-      <h2>Gastos Reales</h2>
+      <h2>💸 Compra de Materiales</h2>
     </div>
     <div class="formulario">
       <p id="gastos-orden-info" class="subtitulo"></p>
 
-      <label>¿Cuánto pagó el cliente? ($)</label>
-      <input type="number" id="cobrado-real" placeholder="0" />
+      <label>Nota (opcional, ej: "Compra martes")</label>
+      <input type="text" id="nota-gasto" placeholder="Descripción de esta compra" />
 
-      <h3>💸 Gastos por componente</h3>
+      <h3>Componentes comprados</h3>
       <div id="gastos-lista"></div>
 
+      <h3>➕ Otros gastos</h3>
+      <div id="gastos-otros-lista"></div>
+      <button type="button" class="btn-principal" style="background:#718096;font-size:15px;padding:12px;margin-bottom:8px" onclick="agregarGastoOtro()">
+        + Añadir otro gasto
+      </button>
+
       <div class="resumen-cotizacion">
-        <div class="fila-resumen"><span>Total gastado:</span><span id="gasto-total">$0</span></div>
+        <div class="fila-resumen"><span>Total esta compra:</span><span id="gasto-total">$0</span></div>
       </div>
 
-      <button class="btn-principal" onclick="guardarGastos()">💾 Guardar Gastos</button>
+      <button class="btn-principal" onclick="guardarGastos()">💾 Guardar esta compra</button>
     </div>
   </div>
 
@@ -142,6 +148,31 @@
       <h2>📊 Análisis de Orden</h2>
     </div>
     <div id="analisis-contenido" class="formulario"></div>
+  </div>
+
+  <!-- PANTALLA 7: ABONOS -->
+  <div id="pantalla-abonos" class="pantalla">
+    <div class="header">
+      <button class="btn-volver" onclick="volverADetalle()">← Volver</button>
+      <h2>💵 Abonos</h2>
+    </div>
+    <div class="formulario">
+      <p id="abonos-orden-info" class="subtitulo"></p>
+
+      <div id="resumen-cobro" class="resumen-cotizacion" style="margin-bottom:16px"></div>
+
+      <h3>Registrar nuevo abono</h3>
+      <label>Valor del abono ($)</label>
+      <input type="number" id="valor-abono" placeholder="$0" min="0" />
+
+      <label>Nota (opcional)</label>
+      <input type="text" id="nota-abono" placeholder="Ej: Anticipo inicial" />
+
+      <button class="btn-principal verde" onclick="guardarAbono()">💾 Guardar Abono</button>
+
+      <h3>Abonos registrados</h3>
+      <div id="lista-abonos-detalle"></div>
+    </div>
   </div>
 
   <!-- PANTALLA 6: DASHBOARD -->

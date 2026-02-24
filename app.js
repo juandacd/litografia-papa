@@ -324,6 +324,7 @@ async function cargarDetalle(ordenId) {
       ${orden.aplica_retefuente ? `<div class="fila-resumen"><span>+ Retefuente (${orden.porcentaje_retefuente}%)</span><span>${formatPesos(orden.precio_sugerido * orden.porcentaje_retefuente / 100)}</span></div>` : ''}
       <div class="fila-resumen total"><span>PRECIO A COBRAR</span><span>${formatPesos(orden.precio_sugerido)}</span></div>
     </div>
+    <div id="resumen-abonos-${ordenId}"></div>
 
     <button class="btn-principal" style="background:#c05621" onclick="generarPDF(${ordenId})">
       📄 Generar PDF Cotización
@@ -334,7 +335,11 @@ async function cargarDetalle(ordenId) {
     </button>
 
     <button class="btn-principal naranja" onclick="mostrarPantalla('pantalla-gastos'); inicializarGastos(${ordenId})">
-      💸 Registrar Gastos Reales
+      💸 Registrar Compra de Materiales
+    </button>
+
+    <button class="btn-principal" style="background:#6b46c1" onclick="mostrarPantalla('pantalla-abonos'); cargarAbonos(${ordenId})">
+      💵 Registrar Abono
     </button>
 
     ${orden.cobrado_real ? `
@@ -342,6 +347,8 @@ async function cargarDetalle(ordenId) {
       📊 Ver Análisis de Ganancia
     </button>` : ''}
   `;
+  cargarResumenAbonos(ordenId);
+  cargarResumenGastosParciales(ordenId);
 }
 
 // =============================================
@@ -372,7 +379,7 @@ function compartirWhatsApp(orden, items) {
 // =============================================
 function inicializarGastos(ordenId) {
   ordenActualId = ordenId;
-  document.getElementById('gastos-orden-info').textContent = `Orden #${ordenId}`;
+  document.getElementById('gastos-orden-info').textContent = `Registrar compra de materiales`;
 
   const contenedor = document.getElementById('gastos-lista');
   contenedor.innerHTML = '';
@@ -398,25 +405,25 @@ function calcularTotalGasto() {
 }
 
 async function guardarGastos() {
-  const cobradoReal = parseFloat(document.getElementById('cobrado-real').value) || 0;
-  if (cobradoReal === 0) { alert('Por favor escribe cuánto pagó el cliente'); return; }
-
   const gastos = [];
+  const nota = document.getElementById('nota-gasto')?.value.trim() || '';
+
   COMPONENTES.forEach(comp => {
     const input = document.getElementById(`gasto-${comp}`);
     const valor = parseFloat(input?.value) || 0;
-    if (valor > 0) gastos.push({ componente: comp, valor, orden_id: ordenActualId });
+    if (valor > 0) gastos.push({ componente: comp, valor, orden_id: ordenActualId, nota });
   });
 
-  // Borrar gastos anteriores si existían
-  await db.from('gasto_items').delete().eq('orden_id', ordenActualId);
+  // Gastos otros
+  document.querySelectorAll('#gastos-otros-lista .componente-fila').forEach(fila => {
+    const nombre = fila.querySelector('input[type="text"]')?.value.trim();
+    const valor = parseFloat(fila.querySelector('.gasto-otro-valor')?.value) || 0;
+    if (nombre && valor > 0) gastos.push({ componente: nombre, valor, orden_id: ordenActualId, nota });
+  });
 
-  if (gastos.length > 0) await db.from('gasto_items').insert(gastos);
+  if (gastos.length === 0) { alert('Por favor registra al menos un gasto'); return; }
 
-  await db.from('ordenes').update({
-    cobrado_real: cobradoReal,
-    estado: 'cerrada'
-  }).eq('id', ordenActualId);
+  await db.from('gasto_items').insert(gastos);
 
   alert('✅ Gastos guardados correctamente');
   cargarDetalle(ordenActualId);
@@ -522,6 +529,15 @@ async function cargarDashboard() {
   const totalCotizado = ordenes.reduce((sum, o) => sum + (o.precio_sugerido || 0), 0);
   const totalCobrado = ordenes.reduce((sum, o) => sum + (o.cobrado_real || 0), 0);
 
+  const { data: todosGastos } = await db.from('gasto_items').select('valor, orden_id');
+  const gastosPorOrden = {};
+  (todosGastos || []).forEach(g => {
+    gastosPorOrden[g.orden_id] = (gastosPorOrden[g.orden_id] || 0) + g.valor;
+  });
+  const totalUtilidades = ordenes
+    .filter(o => o.cobrado_real > 0 && gastosPorOrden[o.id])
+    .reduce((sum, o) => sum + (o.cobrado_real - gastosPorOrden[o.id]), 0);
+
   // Mes actual
   const mesActual = hoy.getMonth();
   const anioActual = hoy.getFullYear();
@@ -565,6 +581,7 @@ async function cargarDashboard() {
       <div class="fila-resumen"><span>🏁 Cerradas</span><span>${cerradas}</span></div>
       <div class="fila-resumen total"><span>Total cotizado</span><span>${formatPesos(totalCotizado)}</span></div>
       <div class="fila-resumen total"><span>Total cobrado</span><span>${formatPesos(totalCobrado)}</span></div>
+      <div class="fila-resumen total" style="color:#276749"><span>💚 Total utilidades</span><span>${formatPesos(totalUtilidades)}</span></div>
     </div>
 
     ${alertasHTML}
@@ -825,6 +842,169 @@ async function borrarOrden(ordenId) {
 
   alert('✅ Cotización borrada correctamente');
   mostrarPantalla('pantalla-inicio');
+}
+
+// =============================================
+// ABONOS
+// =============================================
+let contadorGastosOtros = 0;
+
+function agregarGastoOtro() {
+  contadorGastosOtros++;
+  const contenedor = document.getElementById('gastos-otros-lista');
+  const fila = document.createElement('div');
+  fila.className = 'componente-fila';
+  fila.id = `gasto-otro-${contadorGastosOtros}`;
+  fila.innerHTML = `
+    <input type="text" placeholder="Concepto" 
+      style="flex:1;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;margin-right:8px" />
+    <input type="number" placeholder="$0" min="0" 
+      class="gasto-otro-valor"
+      style="width:110px;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;text-align:right"
+      onchange="calcularTotalGasto()" />
+    <button onclick="document.getElementById('gasto-otro-${contadorGastosOtros}').remove(); calcularTotalGasto();" 
+      style="background:none;border:none;color:#e53e3e;font-size:20px;cursor:pointer;margin-left:8px">✕</button>
+  `;
+  contenedor.appendChild(fila);
+}
+
+function calcularTotalGasto() {
+  let total = 0;
+  COMPONENTES.forEach(comp => {
+    const input = document.getElementById(`gasto-${comp}`);
+    if (input) total += parseFloat(input.value) || 0;
+  });
+  document.querySelectorAll('.gasto-otro-valor').forEach(input => {
+    total += parseFloat(input.value) || 0;
+  });
+  document.getElementById('gasto-total').textContent = formatPesos(total);
+}
+
+async function cargarAbonos(ordenId) {
+  ordenActualId = ordenId;
+  const { data: orden } = await db.from('ordenes').select('*').eq('id', ordenId).single();
+  const { data: abonos } = await db.from('abonos').select('*').eq('orden_id', ordenId).order('created_at', { ascending: true });
+
+  document.getElementById('abonos-orden-info').textContent = `${orden.numero_orden} - ${orden.cliente}`;
+
+  const totalAbonado = (abonos || []).reduce((sum, a) => sum + a.valor, 0);
+  const falta = (orden.precio_sugerido || 0) - totalAbonado;
+
+  document.getElementById('resumen-cobro').innerHTML = `
+    <div class="fila-resumen"><span>💰 Valor a cobrar</span><span>${formatPesos(orden.precio_sugerido)}</span></div>
+    <div class="fila-resumen"><span>✅ Total abonado</span><span>${formatPesos(totalAbonado)}</span></div>
+    <div class="fila-resumen total" style="color:${falta > 0 ? '#e53e3e' : '#276749'}">
+      <span>${falta > 0 ? '⏳ Falta por cobrar' : '✅ Pagado completo'}</span>
+      <span>${formatPesos(Math.abs(falta))}</span>
+    </div>
+  `;
+
+  const lista = document.getElementById('lista-abonos-detalle');
+  lista.innerHTML = '';
+  if (!abonos || abonos.length === 0) {
+    lista.innerHTML = '<p class="cargando">No hay abonos registrados</p>';
+  } else {
+    abonos.forEach(a => {
+      lista.innerHTML += `
+        <div class="tarjeta-orden">
+          <div class="orden-cliente">${formatPesos(a.valor)}</div>
+          <div class="orden-descripcion">${a.nota || 'Sin nota'}</div>
+          <div class="orden-numero">${new Date(a.created_at).toLocaleDateString('es-CO')}</div>
+        </div>
+      `;
+    });
+  }
+}
+
+async function guardarAbono() {
+  const valor = parseFloat(document.getElementById('valor-abono').value) || 0;
+  if (valor <= 0) { alert('Por favor escribe el valor del abono'); return; }
+
+  const nota = document.getElementById('nota-abono').value.trim();
+
+  await db.from('abonos').insert([{ orden_id: ordenActualId, valor, nota }]);
+
+  // Actualizar total abonado en la orden
+  const { data: abonos } = await db.from('abonos').select('valor').eq('orden_id', ordenActualId);
+  const totalAbonado = (abonos || []).reduce((sum, a) => sum + a.valor, 0);
+  const { data: orden } = await db.from('ordenes').select('precio_sugerido').eq('id', ordenActualId).single();
+
+  const nuevoEstado = totalAbonado >= orden.precio_sugerido ? 'cerrada' : 'en-proceso';
+  await db.from('ordenes').update({ total_abonado: totalAbonado, estado: nuevoEstado, cobrado_real: totalAbonado }).eq('id', ordenActualId);
+
+  document.getElementById('valor-abono').value = '';
+  document.getElementById('nota-abono').value = '';
+
+  alert('✅ Abono guardado');
+  cargarAbonos(ordenActualId);
+}
+
+async function cargarResumenAbonos(ordenId) {
+  const { data: orden } = await db.from('ordenes').select('*').eq('id', ordenId).single();
+  const { data: abonos } = await db.from('abonos').select('valor').eq('orden_id', ordenId);
+
+  const totalAbonado = (abonos || []).reduce((sum, a) => sum + a.valor, 0);
+  const falta = (orden.precio_sugerido || 0) - totalAbonado;
+
+  const contenedor = document.getElementById(`resumen-abonos-${ordenId}`);
+  if (!contenedor) return;
+
+  contenedor.innerHTML = `
+    <div class="resumen-cotizacion" style="margin-top:8px">
+      <div class="fila-resumen"><span>💰 A cobrar</span><span>${formatPesos(orden.precio_sugerido)}</span></div>
+      <div class="fila-resumen"><span>✅ Abonado</span><span>${formatPesos(totalAbonado)}</span></div>
+      <div class="fila-resumen total" style="color:${falta > 0 ? '#e53e3e' : '#276749'}">
+        <span>${falta > 0 ? '⏳ Falta' : '✅ Pagado'}</span><span>${formatPesos(Math.abs(falta))}</span>
+      </div>
+    </div>
+  `;
+}
+
+async function cargarResumenGastosParciales(ordenId) {
+  const { data: cotItems } = await db.from('cotizacion_items').select('*').eq('orden_id', ordenId);
+  const { data: gastos } = await db.from('gasto_items').select('*').eq('orden_id', ordenId);
+
+  if (!cotItems || cotItems.length === 0) return;
+
+  // Agrupar gastos por componente
+  const gastadoPor = {};
+  (gastos || []).forEach(g => {
+    gastadoPor[g.componente] = (gastadoPor[g.componente] || 0) + g.valor;
+  });
+
+  const totalCotizado = cotItems.reduce((sum, i) => sum + i.valor, 0);
+  const totalGastado = Object.values(gastadoPor).reduce((sum, v) => sum + v, 0);
+  const falta = totalCotizado - totalGastado;
+
+  // Insertar en el detalle
+  const contenido = document.getElementById('detalle-contenido');
+  if (!contenido) return;
+
+  let filasHTML = '';
+  cotItems.forEach(item => {
+    const gastado = gastadoPor[item.componente] || 0;
+    const diff = item.valor - gastado;
+    filasHTML += `
+      <div class="fila-resumen">
+        <span>${item.componente}</span>
+        <span style="color:${diff > 0 ? '#e53e3e' : '#276749'}">${gastado > 0 ? formatPesos(gastado) : '⏳ Pendiente'}</span>
+      </div>
+    `;
+  });
+
+  const divGastos = document.createElement('div');
+  divGastos.innerHTML = `
+    <h3>🛒 Estado de compras</h3>
+    <div class="resumen-cotizacion">
+      ${filasHTML}
+      <div class="fila-resumen total"><span>Total comprado</span><span>${formatPesos(totalGastado)}</span></div>
+      <div class="fila-resumen total" style="color:${falta > 0 ? '#e53e3e' : '#276749'}">
+        <span>${falta > 0 ? 'Falta comprar' : '✅ Todo comprado'}</span>
+        <span>${formatPesos(Math.abs(falta))}</span>
+      </div>
+    </div>
+  `;
+  contenido.appendChild(divGastos);
 }
 
 // Iniciar app
