@@ -342,10 +342,13 @@ async function cargarDetalle(ordenId) {
       💵 Registrar Abono
     </button>
 
-    ${orden.cobrado_real ? `
+    ${orden.estado !== 'cerrada' ? `
+    <button class="btn-principal verde" onclick="cerrarOrden(${ordenId})">
+      🏁 Cerrar Orden
+    </button>` : `
     <button class="btn-principal verde" onclick="mostrarPantalla('pantalla-analisis'); cargarAnalisis(${ordenId})">
       📊 Ver Análisis de Ganancia
-    </button>` : ''}
+    </button>`}
   `;
   cargarResumenAbonos(ordenId);
   cargarResumenGastosParciales(ordenId);
@@ -1005,6 +1008,42 @@ async function cargarResumenGastosParciales(ordenId) {
     </div>
   `;
   contenido.appendChild(divGastos);
+}
+
+// =============================================
+// CERRAR ORDEN
+// =============================================
+async function cerrarOrden(ordenId) {
+  const { data: orden } = await db.from('ordenes').select('*').eq('id', ordenId).single();
+  const { data: abonos } = await db.from('abonos').select('valor').eq('orden_id', ordenId);
+  const { data: gastos } = await db.from('gasto_items').select('valor').eq('orden_id', ordenId);
+
+  const totalAbonado = (abonos || []).reduce((sum, a) => sum + a.valor, 0);
+  const totalGastado = (gastos || []).reduce((sum, g) => sum + g.valor, 0);
+  const cobradoFinal = totalAbonado > 0 ? totalAbonado : orden.cobrado_real || orden.precio_sugerido;
+
+  const ganancia = cobradoFinal - totalGastado;
+  const margen = cobradoFinal > 0 ? (ganancia / cobradoFinal * 100).toFixed(1) : 0;
+
+  const confirmado = confirm(
+    `¿Cerrar esta orden?\n\n` +
+    `💰 Cobrado: ${formatPesos(cobradoFinal)}\n` +
+    `💸 Gastado en materiales: ${formatPesos(totalGastado)}\n` +
+    `✅ Ganancia: ${formatPesos(ganancia)}\n` +
+    `📊 Margen: ${margen}%\n\n` +
+    `Una vez cerrada quedará en el análisis de ganancia.`
+  );
+
+  if (!confirmado) return;
+
+  await db.from('ordenes').update({
+    estado: 'cerrada',
+    cobrado_real: cobradoFinal,
+    total_abonado: totalAbonado
+  }).eq('id', ordenId);
+
+  alert('✅ Orden cerrada correctamente');
+  cargarDetalle(ordenId);
 }
 
 // Iniciar app
