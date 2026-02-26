@@ -841,6 +841,7 @@ async function borrarOrden(ordenId) {
 
   await db.from('cotizacion_items').delete().eq('orden_id', ordenId);
   await db.from('gasto_items').delete().eq('orden_id', ordenId);
+  await db.from('abonos').delete().eq('orden_id', ordenId);
   await db.from('ordenes').delete().eq('id', ordenId);
 
   alert('✅ Cotización borrada correctamente');
