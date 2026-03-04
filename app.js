@@ -361,9 +361,9 @@ function compartirWhatsApp(orden, items) {
 
   let mensaje = `*COTIZACIÓN DC SERVICIOS*\n`;
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
-  mensaje += `📋 Orden: ${orden.numero_orden}\n`;
-  mensaje += `👤 ${orden.cliente}\n`;
-  if (orden.fecha_entrega) mensaje += `📅 Entrega: ${orden.fecha_entrega}\n`;
+  mensaje += `Orden: ${orden.numero_orden}\n`;
+  mensaje += `${orden.cliente}\n`;
+  if (orden.fecha_entrega) mensaje += `Entrega: ${orden.fecha_entrega}\n`;
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
 
   const camposBase = [
@@ -401,7 +401,7 @@ function compartirWhatsApp(orden, items) {
   if (campos.notas) mensaje += `*NOTA:* ${campos.notas}\n`;
 
   mensaje += `\n_Validez de la oferta: 15 días_\n`;
-  mensaje += `_Gracias por su preferencia_ 🙏`;
+  mensaje += `_Gracias por su preferencia_`;
 
   const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
   window.open(url, '_blank');
