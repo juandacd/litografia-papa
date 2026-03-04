@@ -705,7 +705,8 @@ async function generarPDF(ordenId) {
   const logoAncho = 28;
   const logoAlto = 24;
   try {
-    doc.addImage(LOGO_B64, 'PNG', logoX, y, logoAncho, logoAlto);
+    const logoImg = await cargarImagenBase64('./Logo_Digital_Center.png');
+    doc.addImage(logoImg, 'PNG', logoX, y, logoAncho, logoAlto);
   } catch(e) { console.log('Logo no cargado:', e); }
 
   // NIT centrado debajo del logo
