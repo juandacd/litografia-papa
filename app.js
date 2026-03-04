@@ -126,11 +126,10 @@ function recopilarCamposPDF() {
     trabajo: document.getElementById('pdf-trabajo')?.value.trim() || '',
     tamano: document.getElementById('pdf-tamano')?.value.trim() || '',
     tintaInterna: document.getElementById('pdf-tinta-interna')?.value.trim() || '',
-    tintaCaratula: document.getElementById('pdf-tinta-caratula')?.value.trim() || '',
     papelCaratula: document.getElementById('pdf-papel-caratula')?.value.trim() || '',
-    papelInterior: document.getElementById('pdf-papel-interior')?.value.trim() || '',
     acabado: document.getElementById('pdf-acabado')?.value.trim() || '',
     pago: document.getElementById('pdf-pago')?.value.trim() || '',
+    notas: document.getElementById('pdf-notas')?.value.trim() || '',
     extras: []
   };
 
@@ -743,75 +742,91 @@ async function generarPDF(ordenId) {
   // Campos del PDF
   const campos = orden.campos_pdf || {};
   const camposBase = [
-    { label: 'TRABAJO', valor: campos.trabajo },
+    { label: 'SERVICIO', valor: campos.trabajo },
     { label: 'TAMAÑO', valor: campos.tamano },
-    { label: 'TINTA INTERNA', valor: campos.tintaInterna },
-    { label: 'TINTA CARÁTULA', valor: campos.tintaCaratula },
-    { label: 'PAPEL CARÁT.', valor: campos.papelCaratula },
-    { label: 'PAPEL INT.', valor: campos.papelInterior },
-    { label: 'ACABADO', valor: campos.acabado },
+    { label: 'TINTAS', valor: campos.tintaInterna },
+    { label: 'MATERIAL', valor: campos.papelCaratula },
+    { label: 'ACABADOS', valor: campos.acabado },
   ];
 
-  // Campos extras
   const extras = campos.extras || [];
   const todosLosCampos = [
     ...camposBase.filter(c => c.valor),
-    ...extras.map(e => ({ label: e.nombre?.toUpperCase() || e.label?.toUpperCase(), valor: e.valor }))
+    ...extras.map(e => ({ label: (e.nombre || e.label || '').toUpperCase(), valor: e.valor }))
   ];
+
+  const labelX = margenIzq;
+  const valorX = margenIzq + 45;
+  const maxValorAncho = margenDer - valorX;
 
   todosLosCampos.forEach(campo => {
     doc.setFont('helvetica', 'bold');
-    doc.text(`${campo.label}:`, margenIzq, y);
+    doc.text(`${campo.label}:`, labelX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(campo.valor, margenIzq + 45, y);
-    y += 7;
+    const lineas = doc.splitTextToSize(campo.valor, maxValorAncho);
+    doc.text(lineas, valorX, y);
+    y += lineas.length * 6 + 1;
   });
 
   // Cantidad
   if (orden.cantidad && orden.cantidad > 1) {
     doc.setFont('helvetica', 'bold');
-    doc.text('CANTIDAD:', margenIzq, y);
+    doc.text('CANTIDAD:', labelX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(String(orden.cantidad), margenIzq + 45, y);
+    doc.text(String(orden.cantidad), valorX, y);
     y += 7;
   }
 
   // Valores
   const valorUnit = orden.cantidad > 1 ? orden.precio_sugerido / orden.cantidad : null;
   doc.setFont('helvetica', 'bold');
-
   if (valorUnit) {
-    doc.text('VALOR UNIT.:', margenIzq, y);
+    doc.text('VALOR UNIT.:', labelX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(formatPesos(valorUnit), margenIzq + 45, y);
+    doc.text(formatPesos(valorUnit), valorX, y);
     y += 7;
     doc.setFont('helvetica', 'bold');
   }
-
-  doc.text('VALOR TOTAL:', margenIzq, y);
+  doc.text('VALOR TOTAL:', labelX, y);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatPesos(orden.precio_sugerido), margenIzq + 45, y);
+  doc.text(formatPesos(orden.precio_sugerido), valorX, y);
   y += 10;
 
   // Línea separadora
   doc.line(margenIzq, y, margenDer, y);
   y += 8;
 
-  // Notas
+  // Forma de pago
+  const formaPago = campos.pago || '50% al contratar y 50% contra entrega.';
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('LOS DISEÑOS ANTERIORES SERAN SUMINISTRADOS POR EL CLIENTE', margenIzq, y);
-  y += 8;
+  doc.text('FORMA DE PAGO:', margenIzq, y);
+  doc.setFont('helvetica', 'normal');
+  const lineasPago = doc.splitTextToSize(formaPago, margenDer - margenIzq - 42);
+  doc.text(lineasPago, margenIzq + 42, y);
+  y += lineasPago.length * 5 + 6;
 
-  const formaPago = campos.formaPago || '50% al contratar y 50% contra entrega.';
-  doc.text(`FORMA DE PAGO: ${formaPago}`, margenIzq, y);
-  y += 10;
+  // Notas del usuario
+  if (campos.notas) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('NOTA:', margenIzq, y);
+    doc.setFont('helvetica', 'normal');
+    const lineasNota = doc.splitTextToSize(campos.notas, margenDer - margenIzq - 16);
+    doc.text(lineasNota, margenIzq + 16, y);
+    y += lineasNota.length * 5 + 6;
+  }
 
+  // Validez oferta (siempre)
+  doc.setFont('helvetica', 'italic');
+  doc.text('Validez de la oferta: 15 días', margenIzq, y);
+  y += 6;
+
+  // RST
   doc.setFont('helvetica', 'normal');
   const notaRst = '"Digital Center se encuentra inscrita en el Régimen Simple de Tributación (RST), por lo tanto, los valores aquí relacionados no causan IVA"';
-  const lineasNota = doc.splitTextToSize(notaRst, ancho);
-  doc.text(lineasNota, margenIzq, y);
-  y += lineasNota.length * 5 + 15;
+  const lineasRst = doc.splitTextToSize(notaRst, margenDer - margenIzq);
+  doc.text(lineasRst, margenIzq, y);
+  y += lineasRst.length * 5 + 15;
 
   // Firma
   doc.setFont('helvetica', 'bold');
