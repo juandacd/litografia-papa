@@ -357,20 +357,51 @@ async function cargarDetalle(ordenId) {
 // WHATSAPP
 // =============================================
 function compartirWhatsApp(orden, items) {
-  let mensaje = `*COTIZACIÓN LITOGRAFÍA*\n`;
+  const campos = orden.campos_pdf || {};
+
+  let mensaje = `*COTIZACIÓN DC SERVICIOS*\n`;
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
   mensaje += `📋 Orden: ${orden.numero_orden}\n`;
-  mensaje += `👤 Cliente: ${orden.cliente}\n`;
-  if (orden.descripcion) mensaje += `📦 Pedido: ${orden.descripcion}\n`;
+  mensaje += `👤 ${orden.cliente}\n`;
   if (orden.fecha_entrega) mensaje += `📅 Entrega: ${orden.fecha_entrega}\n`;
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
-  mensaje += `*DETALLE DE COSTOS:*\n`;
-  items.forEach(item => {
-    mensaje += `• ${item.componente}: ${formatPesos(item.valor)}\n`;
+
+  const camposBase = [
+    { label: 'SERVICIO', valor: campos.trabajo },
+    { label: 'TAMAÑO', valor: campos.tamano },
+    { label: 'TINTAS', valor: campos.tintaInterna },
+    { label: 'MATERIAL', valor: campos.papelCaratula },
+    { label: 'ACABADOS', valor: campos.acabado },
+  ];
+
+  camposBase.filter(c => c.valor).forEach(c => {
+    mensaje += `*${c.label}:* ${c.valor}\n`;
   });
+
+  const extras = campos.extras || [];
+  extras.forEach(e => {
+    const label = e.nombre || e.label || '';
+    if (label && e.valor) mensaje += `*${label.toUpperCase()}:* ${e.valor}\n`;
+  });
+
+  if (orden.cantidad > 1) mensaje += `*CANTIDAD:* ${orden.cantidad}\n`;
+
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
-  mensaje += `💰 *TOTAL A COBRAR: ${formatPesos(orden.precio_sugerido)}*\n`;
-  mensaje += `\n_Gracias por su preferencia_ 🙏`;
+
+  if (orden.cantidad > 1) {
+    const valorUnit = orden.precio_sugerido / orden.cantidad;
+    mensaje += `*VALOR UNIT.:* ${formatPesos(valorUnit)}\n`;
+  }
+  mensaje += `*VALOR TOTAL: ${formatPesos(orden.precio_sugerido)}*\n`;
+  mensaje += `━━━━━━━━━━━━━━━━━━\n`;
+
+  const formaPago = campos.pago || '50% al contratar y 50% contra entrega.';
+  mensaje += `*FORMA DE PAGO:* ${formaPago}\n`;
+
+  if (campos.notas) mensaje += `*NOTA:* ${campos.notas}\n`;
+
+  mensaje += `\n_Validez de la oferta: 15 días_\n`;
+  mensaje += `_Gracias por su preferencia_ 🙏`;
 
   const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
   window.open(url, '_blank');
