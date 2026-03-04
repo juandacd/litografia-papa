@@ -166,14 +166,14 @@ function calcularTotal() {
   const margen = subtotal1 * pctMargen;
   const subtotal2 = subtotal1 + margen;
   const rete = aplicaRete ? subtotal2 * pctRete : 0;
-  const total = subtotal2 + rete;
+  const total = redondearMil(subtotal2 + rete);
+  const unitario = cantidad > 0 ? redondearMil(total / cantidad) : 0;
 
   document.getElementById('res-costo-base').textContent = formatPesos(costoBase);
   document.getElementById('res-indirectos').textContent = `+${formatPesos(indirectos)}`;
   document.getElementById('res-margen').textContent = `+${formatPesos(margen)}`;
   document.getElementById('res-rete').textContent = `+${formatPesos(rete)}`;
   document.getElementById('res-total').textContent = formatPesos(total);
-  const unitario = cantidad > 0 ? total / cantidad : 0;
   document.getElementById('res-unitario').textContent = formatPesos(unitario);
 }
 
@@ -214,7 +214,7 @@ async function guardarCotizacion() {
   const margen = subtotal1 * (pctMargen / 100);
   const subtotal2 = subtotal1 + margen;
   const rete = aplicaRete ? subtotal2 * (pctRete / 100) : 0;
-  const precioSugerido = subtotal2 + rete;
+  const precioSugerido = redondearMil(subtotal2 + rete);
 
   // Guardar orden
   const { data: orden, error } = await db.from('ordenes').insert([{
@@ -389,7 +389,7 @@ function compartirWhatsApp(orden, items) {
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
 
   if (orden.cantidad > 1) {
-    const valorUnit = orden.precio_sugerido / orden.cantidad;
+    const valorUnit = redondearMil(orden.precio_sugerido / orden.cantidad);
     mensaje += `*VALOR UNIT.:* ${formatPesos(valorUnit)}\n`;
   }
   mensaje += `*VALOR TOTAL: ${formatPesos(orden.precio_sugerido)}*\n`;
@@ -517,6 +517,10 @@ function generarNumeroOrden() {
   const day = String(now.getDate()).padStart(2, '0');
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
   return `ORD-${year}${month}${day}-${random}`;
+}
+
+function redondearMil(valor) {
+  return Math.ceil(valor / 1000) * 1000;
 }
 
 function formatPesos(valor) {
@@ -809,7 +813,7 @@ async function generarPDF(ordenId) {
   }
 
   // Valores
-  const valorUnit = orden.cantidad > 1 ? orden.precio_sugerido / orden.cantidad : null;
+  const valorUnit = orden.cantidad > 1 ? redondearMil(orden.precio_sugerido / orden.cantidad) : null;
   doc.setFont('helvetica', 'bold');
   if (valorUnit) {
     doc.text('VALOR UNIT.:', labelX, y);
