@@ -700,24 +700,23 @@ async function generarPDF(ordenId) {
   const ancho = margenDer - margenIzq;
   let y = 15;
 
-  // Logo
+  // Logo centrado a la izquierda con NIT debajo
+  const logoX = margenIzq;
+  const logoAncho = 28;
+  const logoAlto = 24;
   try {
-    const logoImg = await cargarImagenBase64('./Logo_Digital_Center.png');
-    doc.addImage(logoImg, 'PNG', margenIzq, y, 35, 30);
+    doc.addImage(LOGO_B64, 'PNG', logoX, y, logoAncho, logoAlto);
   } catch(e) { console.log('Logo no cargado:', e); }
 
-  // Encabezado empresa
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Digital Center', 60, y + 8);
+  // NIT centrado debajo del logo
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text('¡Imprime tus ideas!', 60, y + 14);
-  doc.text('NIT: 1152467424-7', 60, y + 20);
-  doc.text('TEL. 319 392 0654', 60, y + 26);
-  doc.text('Medellín - Colombia', 60, y + 32);
+  const nitTexto = 'NIT: 1152467424-7';
+  const nitAncho = doc.getTextWidth(nitTexto);
+  const nitX = logoX + (logoAncho / 2) - (nitAncho / 2);
+  doc.text(nitTexto, nitX, y + logoAlto + 4);
 
-  y += 45;
+  y += logoAlto + 10;
 
   // Fecha y cliente
   const fechaHoy = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
