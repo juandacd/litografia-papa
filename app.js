@@ -756,7 +756,7 @@ async function generarPDF(ordenId) {
   const nitX = logoX + (logoAncho / 2) - (nitAncho / 2);
   doc.text(nitTexto, nitX, y + logoAlto + 4);
 
-  y += logoAlto + 10;
+  y += logoAlto + 16;
 
   // Fecha y cliente
   const fechaHoy = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -881,7 +881,10 @@ async function generarPDF(ordenId) {
   doc.setFontSize(8);
   doc.setDrawColor(200, 200, 200);
   doc.line(margenIzq, 280, margenDer, 280);
-  doc.text('dc.digitalcenter / TEL. 319 392 0654 / MEDELLIN- COLOMBIA / E-MAIL.: dc.digitalcenter7@gmail.com', margenIzq, 285);
+  const pieTexto = 'dc.digitalcenter / TEL. 319 392 0654 / MEDELLIN- COLOMBIA / E-MAIL.: dc.digitalcenter7@gmail.com';
+  const pieAncho = doc.getTextWidth(pieTexto);
+  const pieX = (210 - pieAncho) / 2;
+  doc.text(pieTexto, pieX, 285);
 
   // Descargar
   doc.save(`Cotizacion_${orden.numero_orden}_${orden.cliente}.pdf`);
