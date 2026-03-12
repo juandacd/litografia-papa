@@ -167,7 +167,7 @@ function calcularTotal() {
   const subtotal2 = subtotal1 + margen;
   const rete = aplicaRete ? subtotal2 * pctRete : 0;
   const total = redondearMil(subtotal2 + rete);
-  const unitario = cantidad > 0 ? redondearMil(total / cantidad) : 0;
+  const unitario = cantidad > 0 ? total / cantidad : 0;
 
   document.getElementById('res-costo-base').textContent = formatPesos(costoBase);
   document.getElementById('res-indirectos').textContent = `+${formatPesos(indirectos)}`;
@@ -389,7 +389,7 @@ function compartirWhatsApp(orden, items) {
   mensaje += `━━━━━━━━━━━━━━━━━━\n`;
 
   if (orden.cantidad > 1) {
-    const valorUnit = redondearMil(orden.precio_sugerido / orden.cantidad);
+    const valorUnit = orden.precio_sugerido / orden.cantidad;
     mensaje += `*VALOR UNIT.:* ${formatPesos(valorUnit)}\n`;
   }
   mensaje += `*VALOR TOTAL: ${formatPesos(orden.precio_sugerido)}*\n`;
@@ -584,6 +584,7 @@ async function cargarDashboard() {
   });
   const cotizadoMes = ordenesMes.reduce((sum, o) => sum + (o.precio_sugerido || 0), 0);
   const cobradoMes = ordenesMes.reduce((sum, o) => sum + (o.cobrado_real || 0), 0);
+  const aprobadoMes = ordenesMes.filter(o => o.estado_aprobacion === 'aprobada').reduce((sum, o) => sum + (o.precio_sugerido || 0), 0);
 
   let alertasHTML = '';
   if (vencidas.length > 0) {
@@ -608,6 +609,10 @@ async function cargarDashboard() {
     <div class="analisis-card verde">
       <div>✅ Cobrado este mes</div>
       <div class="valor">${formatPesos(cobradoMes)}</div>
+    </div>
+    <div class="analisis-card" style="border-color:#9ae6b4;background:#f0fff4">
+      <div>🤝 Aprobado este mes</div>
+      <div class="valor" style="color:#276749">${formatPesos(aprobadoMes)}</div>
     </div>
 
     <h3>📊 Resumen general</h3>
@@ -813,7 +818,7 @@ async function generarPDF(ordenId) {
   }
 
   // Valores
-  const valorUnit = orden.cantidad > 1 ? redondearMil(orden.precio_sugerido / orden.cantidad) : null;
+  const valorUnit = orden.cantidad > 1 ? orden.precio_sugerido / orden.cantidad : null;
   doc.setFont('helvetica', 'bold');
   if (valorUnit) {
     doc.text('VALOR UNIT.:', labelX, y);
